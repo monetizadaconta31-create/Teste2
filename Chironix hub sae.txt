@@ -1,0 +1,525 @@
+-- deobf by prince
+
+local missing = {}
+if type(getgenv) ~= "function" then missing[#missing + 1] = "getgenv" end
+if type(loadstring) ~= "function" then missing[#missing + 1] = "loadstring" end
+local okH, hasH = pcall(function() return type(game.HttpGet) == "function" or typeof(game.HttpGet) == "function" end)
+if not (okH and hasH) then missing[#missing + 1] = "game:HttpGet" end
+if #missing > 0 then
+	local exec = "this executor"
+	pcall(function() exec = tostring(identifyexecutor()) end)
+	local msg = "Chronix can't run on " .. exec .. " - missing: " .. table.concat(missing, ", ")
+	warn(msg)
+	pcall(function()
+		game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Chronix", Text = msg, Duration = 10})
+	end)
+	return
+end
+
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+
+local G = getgenv()
+if G.Chronix and type(G.Chronix.Unload) == "function" then pcall(G.Chronix.Unload) end
+local Chronix = {Running = true}
+G.Chronix = Chronix
+
+local function frame()
+	local ok = pcall(function() task.wait() end)
+	if not ok then pcall(function() RunService.Heartbeat:Wait() end) end
+end
+
+local function notify(text)
+	pcall(function()
+		StarterGui:SetCore("SendNotification", {Title = "Chronix", Text = text, Duration = 5})
+	end)
+end
+
+local function fetch(url)
+	local ok, res = pcall(function() return game:HttpGet(url) end)
+	if ok and type(res) == "string" and #res > 0 then return res end
+	return nil
+end
+
+local CAPVALS = {
+	getgenv = getgenv,
+	writefile = writefile,
+	readfile = readfile,
+	isfile = isfile,
+	firetouchinterest = firetouchinterest,
+	fireproximityprompt = fireproximityprompt,
+	getconnections = getconnections,
+	hookmetamethod = hookmetamethod,
+	gethui = gethui,
+}
+local function capOK(name)
+	if name == "Drawing" then
+		return type(Drawing) == "table" and type(Drawing.new) == "function"
+	end
+	return type(CAPVALS[name]) == "function"
+end
+local function checkNeeds(needs)
+	local miss = {}
+	if type(needs) ~= "table" then return miss end
+	for _, n in ipairs(needs) do
+		if not capOK(n) then miss[#miss + 1] = n end
+	end
+	return miss
+end
+
+local function protectParent(sg)
+	local okHui, hui = pcall(function() return gethui() end)
+	if okHui and typeof(hui) == "Instance" then
+		sg.Parent = hui
+		return
+	end
+	if syn and type(syn.protect_gui) == "function" then pcall(syn.protect_gui, sg) end
+	if pcall(function() sg.Parent = game:GetService("CoreGui") end) and sg.Parent then return end
+	local lp = Players.LocalPlayer
+	local pg = lp and lp:FindFirstChildOfClass("PlayerGui")
+	if pg then sg.Parent = pg end
+end
+
+local function makeWatermark()
+	local TextService = game:GetService("TextService")
+	local UserInputService = game:GetService("UserInputService")
+	local Players = game:GetService("Players")
+	local text = "Made by 6z4b on Rscripts & Discord"
+	local small = false
+	pcall(function()
+		local cam = workspace.CurrentCamera
+		small = UserInputService.TouchEnabled or (cam and cam.ViewportSize.X < 700)
+	end)
+	local size = small and 11 or 13
+	local pad = small and 10 or 14
+	local height = small and 20 or 24
+	local width = 240
+	pcall(function()
+		width = TextService:GetTextSize(text, size, Enum.Font.GothamSemibold, Vector2.new(4000, 100)).X + pad * 2
+	end)
+	local sg = Instance.new("ScreenGui")
+	sg.Name = "wm" .. tostring(math.random(100000, 999999))
+	sg.ResetOnSpawn = false
+	sg.IgnoreGuiInset = true
+	sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	pcall(function() sg.DisplayOrder = 2147483647 end)
+	local box = Instance.new("Frame")
+	box.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+	box.BackgroundTransparency = 0.2
+	box.BorderSizePixel = 0
+	box.Position = UDim2.new(0, 8, 0, 8)
+	box.Size = UDim2.new(0, width, 0, height)
+	box.Parent = sg
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 6)
+	corner.Parent = box
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(95, 125, 255)
+	stroke.Thickness = 1
+	stroke.Transparency = 0.35
+	stroke.Parent = box
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Position = UDim2.new(0, pad, 0, 0)
+	label.Size = UDim2.new(1, -pad * 2, 1, 0)
+	label.Font = Enum.Font.GothamSemibold
+	label.Text = text
+	label.TextColor3 = Color3.fromRGB(240, 242, 252)
+	label.TextSize = size
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = box
+	if typeof(gethui) == "function" then
+		pcall(function() sg.Parent = gethui() end)
+	end
+	if not sg.Parent then
+		pcall(function()
+			if syn and typeof(syn.protect_gui) == "function" then syn.protect_gui(sg) end
+			sg.Parent = game:GetService("CoreGui")
+		end)
+	end
+	if not sg.Parent then
+		pcall(function() sg.Parent = Players.LocalPlayer:WaitForChild("PlayerGui", 5) end)
+	end
+	return sg
+end
+
+local function makeSplash(name)
+	local sg = Instance.new("ScreenGui")
+	sg.Name = "ChronixSplash"
+	sg.ResetOnSpawn = false
+	sg.IgnoreGuiInset = true
+	sg.DisplayOrder = 999
+	sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+	local dim = Instance.new("Frame")
+	dim.Size = UDim2.fromScale(1, 1)
+	dim.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	dim.BackgroundTransparency = 0.4
+	dim.BorderSizePixel = 0
+	dim.Parent = sg
+
+	local card = Instance.new("Frame")
+	card.AnchorPoint = Vector2.new(0.5, 0.5)
+	card.Position = UDim2.fromScale(0.5, 0.5)
+	card.Size = UDim2.fromOffset(244, 122)
+	card.BackgroundColor3 = Color3.fromRGB(21, 21, 29)
+	card.BorderSizePixel = 0
+	card.Parent = sg
+	local cc = Instance.new("UICorner") cc.CornerRadius = UDim.new(0, 12) cc.Parent = card
+	local cs = Instance.new("UIStroke") cs.Color = Color3.fromRGB(148, 108, 255) cs.Transparency = 0.4 cs.Thickness = 1 cs.Parent = card
+
+	local brand = Instance.new("TextLabel")
+	brand.BackgroundTransparency = 1
+	brand.Position = UDim2.fromOffset(0, 20)
+	brand.Size = UDim2.new(1, 0, 0, 15)
+	brand.Font = Enum.Font.GothamBold
+	brand.TextSize = 13
+	brand.TextColor3 = Color3.fromRGB(148, 108, 255)
+	brand.Text = "CHRONIX HUB"
+	brand.Parent = card
+
+	local nm = Instance.new("TextLabel")
+	nm.BackgroundTransparency = 1
+	nm.Position = UDim2.fromOffset(12, 42)
+	nm.Size = UDim2.new(1, -24, 0, 24)
+	nm.Font = Enum.Font.GothamBold
+	nm.TextSize = 18
+	nm.TextColor3 = Color3.fromRGB(235, 230, 255)
+	nm.TextTruncate = Enum.TextTruncate.AtEnd
+	nm.Text = name
+	nm.Parent = card
+
+	local sub = Instance.new("TextLabel")
+	sub.BackgroundTransparency = 1
+	sub.Position = UDim2.fromOffset(0, 74)
+	sub.Size = UDim2.new(1, 0, 0, 15)
+	sub.Font = Enum.Font.Gotham
+	sub.TextSize = 12
+	sub.TextColor3 = Color3.fromRGB(150, 150, 170)
+	sub.Text = "loading"
+	sub.Parent = card
+
+	local barbg = Instance.new("Frame")
+	barbg.AnchorPoint = Vector2.new(0.5, 1)
+	barbg.Position = UDim2.new(0.5, 0, 1, -14)
+	barbg.Size = UDim2.fromOffset(204, 4)
+	barbg.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+	barbg.BorderSizePixel = 0
+	barbg.Parent = card
+	local bbc = Instance.new("UICorner") bbc.CornerRadius = UDim.new(1, 0) bbc.Parent = barbg
+	local barfill = Instance.new("Frame")
+	barfill.Size = UDim2.fromScale(0.45, 1)
+	barfill.BackgroundColor3 = Color3.fromRGB(148, 108, 255)
+	barfill.BorderSizePixel = 0
+	barfill.Parent = barbg
+	local bfc = Instance.new("UICorner") bfc.CornerRadius = UDim.new(1, 0) bfc.Parent = barfill
+
+	pcall(protectParent, sg)
+	return sg
+end
+
+local RAW = "https://raw.githubusercontent.com/SmokeTY/Hidden-Scripts/main/"
+local catalog = {
+	{name = "Final Swarm", gameIds = {9551044479}, url = RAW .. "Final%20Swarm", needs = {"writefile", "readfile", "isfile", "getconnections"}},
+	{name = "Project Delta", gameIds = {2862098693}, url = RAW .. "Project%20Delta", needs = {"writefile", "readfile", "isfile", "Drawing"}},
+	{name = "Grow a Chicken Fighter", gameIds = {10338952197}, url = RAW .. "Grow%20a%20Chicken%20Fighter", needs = {"writefile", "readfile", "isfile", "firetouchinterest"}},
+	{name = "Blox Fruits", gameIds = {994732206}, url = RAW .. "%E2%9A%94%EF%B8%8F%20Blox%20Fruits", needs = {"writefile", "readfile", "isfile", "firetouchinterest"}},
+	{name = "Capybaras VS Plants", gameIds = {8841437826}, url = RAW .. "Capybaras%20VS%20Plants", needs = {"writefile", "readfile", "isfile"}},
+	{name = "Perimeter Zero", gameIds = {9161571268}, url = RAW .. "trissy%20script", needs = {"writefile", "readfile", "isfile", "Drawing"}},
+	{name = "TheTower", gameIds = {6701101774}, url = RAW .. "TheTower", needs = {}},
+	{name = "Sell Ores", gameIds = {10336278580}, url = RAW .. "%5B%F0%9F%92%8E%5D%20Sell%20Ores%20%E2%9B%8F%EF%B8%8F", needs = {"writefile", "readfile", "isfile"}},
+	{name = "Steal an Egg", gameIds = {10563114921}, url = RAW .. "Steal%20an%20Egg", needs = {}},
+	{name = "Greedy Growers", gameIds = {10440833423}, url = RAW .. "Greedy%20Growers", needs = {}},
+}
+
+local function findMatch(list, gid)
+	for i = 1, #list do
+		local ids = list[i].gameIds or {}
+		for j = 1, #ids do
+			if ids[j] == gid then return list[i] end
+		end
+	end
+	return nil
+end
+
+local function run(entry)
+	local splash
+	pcall(function() splash = makeSplash(entry.name) end)
+	frame()
+	local src = fetch(entry.url)
+	if not src then
+		if splash then pcall(function() splash:Destroy() end) end
+		notify(entry.name .. " download failed")
+		return false
+	end
+	local fn, err = loadstring(src)
+	if not fn then
+		if splash then pcall(function() splash:Destroy() end) end
+		notify(entry.name .. " load error")
+		warn("Chronix loadstring: " .. tostring(err))
+		return false
+	end
+	src = nil
+	frame()
+	local okR, runErr = pcall(fn)
+	if splash then pcall(function() splash:Destroy() end) end
+	if not okR then
+		notify(entry.name .. " error")
+		warn("Chronix run: " .. tostring(runErr))
+		return false
+	end
+	return true
+end
+
+local function buildPanel(unsupported, entry, capsMissing)
+	local conns = {}
+	local function track(c)
+		conns[#conns + 1] = c
+		return c
+	end
+
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "ChronixHub"
+	gui.ResetOnSpawn = false
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+	local unloaded = false
+	local function unload()
+		if unloaded then return end
+		unloaded = true
+		Chronix.Running = false
+		for i = 1, #conns do
+			pcall(function() conns[i]:Disconnect() end)
+		end
+		pcall(function() gui:Destroy() end)
+		if Chronix.Watermark then
+			pcall(function() Chronix.Watermark:Destroy() end)
+			Chronix.Watermark = nil
+		end
+		if G.Chronix == Chronix then G.Chronix = nil end
+	end
+	Chronix.Unload = unload
+
+	local cam = workspace.CurrentCamera
+	local vp = (cam and cam.ViewportSize) or Vector2.new(800, 600)
+	local W = math.floor(math.min(330, vp.X - 24))
+	local H = math.floor(math.min(360, vp.Y - 60))
+
+	local main = Instance.new("Frame")
+	main.Size = UDim2.fromOffset(W, H)
+	main.Position = UDim2.new(0.5, 0, 0.5, 0)
+	main.AnchorPoint = Vector2.new(0.5, 0.5)
+	main.BackgroundColor3 = Color3.fromRGB(21, 21, 29)
+	main.BorderSizePixel = 0
+	main.Active = true
+	main.Parent = gui
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = main
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(148, 108, 255)
+	stroke.Transparency = 0.45
+	stroke.Thickness = 1
+	stroke.Parent = main
+
+	local titleBar = Instance.new("Frame")
+	titleBar.Size = UDim2.new(1, 0, 0, 40)
+	titleBar.BackgroundTransparency = 1
+	titleBar.Parent = main
+
+	local title = Instance.new("TextLabel")
+	title.Size = UDim2.new(1, -50, 1, 0)
+	title.Position = UDim2.fromOffset(14, 0)
+	title.BackgroundTransparency = 1
+	title.Font = Enum.Font.GothamBold
+	title.TextSize = 17
+	title.TextColor3 = Color3.fromRGB(235, 230, 255)
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.Text = "Chronix Hub"
+	title.Parent = titleBar
+
+	local closeBtn = Instance.new("TextButton")
+	closeBtn.Size = UDim2.fromOffset(40, 40)
+	closeBtn.Position = UDim2.new(1, -40, 0, 0)
+	closeBtn.BackgroundTransparency = 1
+	closeBtn.Font = Enum.Font.GothamBold
+	closeBtn.TextSize = 18
+	closeBtn.TextColor3 = Color3.fromRGB(200, 200, 215)
+	closeBtn.Text = "X"
+	closeBtn.Parent = titleBar
+
+	local body = Instance.new("ScrollingFrame")
+	body.Size = UDim2.new(1, -20, 1, -76)
+	body.Position = UDim2.fromOffset(10, 46)
+	body.BackgroundTransparency = 1
+	body.BorderSizePixel = 0
+	body.ScrollBarThickness = 4
+	body.ScrollBarImageColor3 = Color3.fromRGB(148, 108, 255)
+	body.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	body.CanvasSize = UDim2.new(0, 0, 0, 0)
+	body.Parent = main
+
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 8)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = body
+
+	local order = 0
+	local function nextOrder()
+		order = order + 1
+		return order
+	end
+
+	local function mkLabel(text, size, col, height)
+		local l = Instance.new("TextLabel")
+		l.Size = UDim2.new(1, -4, 0, height or 18)
+		l.BackgroundTransparency = 1
+		l.Font = size >= 16 and Enum.Font.GothamBold or Enum.Font.Gotham
+		l.TextSize = size
+		l.TextColor3 = col
+		l.TextXAlignment = Enum.TextXAlignment.Left
+		l.TextYAlignment = Enum.TextYAlignment.Top
+		l.TextWrapped = true
+		l.Text = text
+		l.LayoutOrder = nextOrder()
+		l.Parent = body
+		return l
+	end
+
+	local function mkButton(text, color)
+		local b = Instance.new("TextButton")
+		b.Size = UDim2.new(1, -4, 0, 40)
+		b.BackgroundColor3 = color
+		b.BorderSizePixel = 0
+		b.AutoButtonColor = true
+		b.Font = Enum.Font.GothamMedium
+		b.TextSize = 14
+		b.TextColor3 = Color3.fromRGB(240, 238, 250)
+		b.Text = text
+		b.LayoutOrder = nextOrder()
+		b.Parent = body
+		local c = Instance.new("UICorner") c.CornerRadius = UDim.new(0, 8) c.Parent = b
+		return b
+	end
+
+	local function tryButton(label)
+		local busy = false
+		local btn = mkButton(label, Color3.fromRGB(88, 60, 170))
+		track(btn.Activated:Connect(function()
+			if busy then return end
+			busy = true
+			pcall(function() gui.Enabled = false end)
+			task.spawn(function()
+				if run(entry) then
+					unload()
+				else
+					pcall(function() gui.Enabled = true end)
+					busy = false
+				end
+			end)
+		end))
+	end
+
+	local function requestLabel()
+		mkLabel("REQUEST A GAME", 13, Color3.fromRGB(148, 108, 255), 18)
+		mkLabel("message 6z4b on discord with the game name to get a script added", 11, Color3.fromRGB(130, 130, 150), 32)
+	end
+
+	if capsMissing and #capsMissing > 0 then
+		local execName = "your executor"
+		pcall(function() execName = tostring(identifyexecutor()) end)
+		mkLabel("Executor not fully supported", 16, Color3.fromRGB(255, 205, 90), 22)
+		mkLabel(execName .. " is missing:", 12, Color3.fromRGB(150, 150, 170), 18)
+		mkLabel(table.concat(capsMissing, ", "), 13, Color3.fromRGB(255, 120, 120), 40)
+		mkLabel((entry and entry.name or "this script") .. " needs these - it may not work right", 11, Color3.fromRGB(150, 150, 170), 30)
+		tryButton("Try Anyway")
+		mkLabel("works best on Volt, Wave, Delta or Vega X", 11, Color3.fromRGB(130, 130, 150), 16)
+	elseif unsupported then
+		mkLabel("Game not currently available", 16, Color3.fromRGB(255, 205, 90), 22)
+		mkLabel("this game isn't supported yet", 12, Color3.fromRGB(150, 150, 170), 20)
+		requestLabel()
+	else
+		mkLabel((entry and entry.name or "Script") .. " failed to load", 16, Color3.fromRGB(255, 120, 120), 22)
+		mkLabel("network issue? tap retry, or request below", 12, Color3.fromRGB(150, 150, 170), 20)
+		tryButton("Retry")
+		requestLabel()
+	end
+
+	local footer = Instance.new("TextLabel")
+	footer.Size = UDim2.new(1, 0, 0, 22)
+	footer.Position = UDim2.new(0, 0, 1, -24)
+	footer.BackgroundTransparency = 1
+	footer.Font = Enum.Font.Gotham
+	footer.TextSize = 11
+	footer.TextColor3 = Color3.fromRGB(120, 120, 140)
+	footer.Text = "msg 6z4b on discord"
+	footer.Parent = main
+
+	track(closeBtn.Activated:Connect(unload))
+	track(gui.Destroying:Connect(unload))
+	track(gui.AncestryChanged:Connect(function(_, parent)
+		if parent == nil then unload() end
+	end))
+
+	local dragging = false
+	local dragStart, startPos
+	track(titleBar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = main.Position
+			local con
+			con = input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+					con:Disconnect()
+				end
+			end)
+		end
+	end))
+	track(UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local d = input.Position - dragStart
+			main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+		end
+	end))
+
+	pcall(protectParent, gui)
+	pcall(function() Chronix.Watermark = makeWatermark() end)
+end
+
+task.spawn(function()
+	local gid = game.GameId
+	local m = findMatch(catalog, gid)
+	if not m then
+		local body = fetch(RAW .. "games.json")
+		if body then
+			local okJ, data = pcall(function() return HttpService:JSONDecode(body) end)
+			if okJ and type(data) == "table" and type(data.scripts) == "table" and #data.scripts > 0 then
+				m = findMatch(data.scripts, gid)
+			end
+		end
+	end
+	if not m then
+		frame()
+		buildPanel(true, nil)
+		return
+	end
+	local miss = checkNeeds(m.needs)
+	if #miss > 0 then
+		frame()
+		buildPanel(false, m, miss)
+		return
+	end
+	if run(m) then
+		if G.Chronix == Chronix then G.Chronix = nil end
+		return
+	end
+	frame()
+	buildPanel(false, m)
+end)
